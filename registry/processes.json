@@ -31,6 +31,15 @@
       ]
     },
     {
+      "id": "PROC-RUNTIME",
+      "repository": "GK-studio-JP/ai-os-runtime",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish"
+      ]
+    },
+    {
       "id": "PROC-BULLETIN",
       "repository": "GK-studio-JP/ai-bulletin-board",
       "capabilities": [
