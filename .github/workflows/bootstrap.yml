@@ -43,3 +43,4 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Bootstrap AI OS kernel"
           git push
+# trigger stage2 bootstrap
