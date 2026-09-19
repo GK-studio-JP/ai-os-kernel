@@ -37,7 +37,10 @@
         "context.read",
         "ipc.send",
         "event.publish"
-      ]
+      ],
+      "routing": {
+        "target_mode": "registered-process-repository"
+      }
     },
     {
       "id": "PROC-RUNTIME-BROWSER-WORKER",
@@ -46,7 +49,10 @@
         "context.read",
         "ipc.send",
         "event.publish"
-      ]
+      ],
+      "routing": {
+        "target_mode": "registered-process-repository"
+      }
     },
     {
       "id": "PROC-BULLETIN",
