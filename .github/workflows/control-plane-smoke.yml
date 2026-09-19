@@ -41,7 +41,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e context
       - name: Build bounded projection
-        run: aios-context snapshot --repo kj2whvbzjn-hue/ai-bulletin-board --state open --default-process PROC-BULLETIN --output-dir projection
+        run: aios-context snapshot --repo GK-studio-JP/ai-bulletin-board --state open --default-process PROC-BULLETIN --output-dir projection
       - name: Select one runnable task
         run: python scheduler/scheduler.py plan --view projection/scheduler-view.json --manifest projection/manifest.json --limit 1 --output dispatch/plan.json
       - name: Validate dispatch target
