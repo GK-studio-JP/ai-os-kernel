@@ -132,14 +132,42 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
             continue
         expected_repo = process.get("repository")
         target_repo = dispatch.get("target_repository")
-        if target_repo and expected_repo and target_repo != expected_repo:
+        routing = process.get("routing") or {}
+        target_mode = routing.get("target_mode", "self")
+
+        if target_mode == "self":
+            if target_repo and expected_repo and target_repo != expected_repo:
+                errors.append(
+                    {
+                        "code": "target_repository_mismatch",
+                        "index": index,
+                        "process": process_id,
+                        "expected": expected_repo,
+                        "actual": target_repo,
+                    }
+                )
+        elif target_mode == "registered-process-repository":
+            registered_repositories = {
+                value.get("repository")
+                for value in processes.values()
+                if value.get("repository")
+            }
+            if target_repo and target_repo not in registered_repositories:
+                errors.append(
+                    {
+                        "code": "target_repository_unregistered",
+                        "index": index,
+                        "process": process_id,
+                        "actual": target_repo,
+                    }
+                )
+        else:
             errors.append(
                 {
-                    "code": "target_repository_mismatch",
+                    "code": "unsupported_target_mode",
                     "index": index,
                     "process": process_id,
-                    "expected": expected_repo,
-                    "actual": target_repo,
+                    "target_mode": target_mode,
                 }
             )
 
