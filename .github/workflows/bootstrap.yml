@@ -1,0 +1,45 @@
+name: bootstrap repository
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch bootstrap payload
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import urllib.request
+
+          url = "https://api.github.com/repos/kj2whvbzjn-hue/browser-agent/issues/80"
+          with urllib.request.urlopen(url) as response:
+              body = json.load(response)["body"]
+
+          marker = "AIOS_BOOTSTRAP_PAYLOAD_V1\n"
+          payload = body.split(marker, 1)[1].strip()
+          with open("/tmp/repo.tar.gz", "wb") as handle:
+              handle.write(base64.b64decode(payload))
+          PY
+
+          tar -xzf /tmp/repo.tar.gz
+          find .github/workflows -type f ! -name bootstrap.yml -delete 2>/dev/null || true
+
+      - name: Commit bootstrap
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Bootstrap AI OS kernel"
+          git push
