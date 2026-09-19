@@ -1,0 +1,93 @@
+name: control plane smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 * * * *'
+  push:
+    paths:
+      - 'kernel.py'
+      - 'registry/**'
+      - 'process.json'
+      - '.github/workflows/control-plane-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout context compiler
+        uses: actions/checkout@v4
+        with:
+          repository: GK-studio-JP/ai-os-context
+          path: context
+      - name: Checkout scheduler
+        uses: actions/checkout@v4
+        with:
+          repository: GK-studio-JP/ai-os-scheduler
+          path: scheduler
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e context
+      - name: Build bounded projection
+        run: aios-context snapshot --repo kj2whvbzjn-hue/ai-bulletin-board --state open --default-process PROC-BULLETIN --output-dir projection
+      - name: Select one runnable task
+        run: python scheduler/scheduler.py plan --view projection/scheduler-view.json --manifest projection/manifest.json --limit 1 --output dispatch/plan.json
+      - name: Validate dispatch target
+        run: python kernel.py validate-dispatch --registry registry/processes.json --plan dispatch/plan.json --output dispatch/kernel-validation.json
+      - name: Build bounded Worker boot bundle
+        run: |
+          python - <<'PY'
+          import json, shutil
+          from pathlib import Path
+          plan = json.loads(Path("dispatch/plan.json").read_text())
+          validation = json.loads(Path("dispatch/kernel-validation.json").read_text())
+          assert validation["valid"]
+          out = Path("worker")
+          out.mkdir(parents=True, exist_ok=True)
+          boot = {
+              "schema": "ai-os-worker-boot:v1",
+              "authoritative": False,
+              "persist_required": True,
+              "source_plan_fingerprint": plan.get("fingerprint"),
+              "dispatch_count": plan.get("dispatch_count", 0),
+              "dispatch": None,
+              "capsule": None,
+              "instructions": [
+                  "Treat this bundle as a non-authoritative boot image.",
+                  "Refresh canonical GitHub state before ownership-sensitive mutation.",
+                  "Page in missing context instead of guessing."
+              ]
+          }
+          if plan["dispatches"]:
+              dispatch = plan["dispatches"][0]
+              ctx = dispatch["context"]
+              src = Path("projection") / ctx["capsule"]
+              shutil.copyfile(src, out / "capsule.json")
+              boot["dispatch"] = dispatch
+              boot["capsule"] = {
+                  "path": "capsule.json",
+                  "fingerprint": ctx["fingerprint"],
+                  "through_comment_id": ctx.get("through_comment_id")
+              }
+          (out / "boot.json").write_text(json.dumps(boot, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+          print("WORKER_BOOT_OK", boot["dispatch_count"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-os-control-plane-bundle
+          path: |
+            dispatch/
+            worker/
+          retention-days: 7
