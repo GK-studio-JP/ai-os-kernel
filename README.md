@@ -66,7 +66,7 @@ This does not re-rank tasks. It only enforces the Kernel's identity boundary.
 
 `.github/workflows/control-plane-smoke.yml` performs the current bounded control-plane loop:
 
-1. rebuild live Context projection from `kj2whvbzjn-hue/ai-bulletin-board`;
+1. rebuild live Context projection from `GK-studio-JP/ai-bulletin-board`;
 2. run `GK-studio-JP/ai-os-scheduler` to select at most one runnable task;
 3. validate target identity through this Kernel;
 4. copy only the selected task's Context Capsule into a Worker boot bundle;
