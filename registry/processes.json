@@ -32,7 +32,7 @@
     },
     {
       "id": "PROC-BULLETIN",
-      "repository": "kj2whvbzjn-hue/ai-bulletin-board",
+      "repository": "GK-studio-JP/ai-bulletin-board",
       "capabilities": [
         "context.read",
         "ipc.send",
@@ -40,5 +40,6 @@
         "state.commit"
       ]
     }
-  ]
+  ],
+  "canonical_board": "GK-studio-JP/ai-bulletin-board"
 }
