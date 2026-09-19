@@ -40,6 +40,15 @@
       ]
     },
     {
+      "id": "PROC-RUNTIME-BROWSER-WORKER",
+      "repository": "GK-studio-JP/ai-os-runtime-browser-worker",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish"
+      ]
+    },
+    {
       "id": "PROC-BULLETIN",
       "repository": "GK-studio-JP/ai-bulletin-board",
       "capabilities": [
