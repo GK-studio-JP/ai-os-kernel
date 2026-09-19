@@ -1,0 +1,28 @@
+{
+  "schema": "ai-os-process:v1",
+  "id": "PROC-KERNEL",
+  "name": "kernel",
+  "repository": "GK-studio-JP/ai-os-kernel",
+  "responsibility": [
+    "process identity",
+    "capability checks",
+    "syscall policy boundary",
+    "IPC authority boundary",
+    "dispatch target validation"
+  ],
+  "excludes": [
+    "task scheduling policy",
+    "subsystem implementation decisions",
+    "context compilation",
+    "implicit capability grants"
+  ],
+  "consumes": [
+    "ai-os-syscall:v1",
+    "ai-os-dispatch-plan:v1",
+    "ai-os-process-registry:v1"
+  ],
+  "provides": [
+    "ai-os-kernel-decision:v1",
+    "ai-os-kernel-dispatch-validation:v1"
+  ]
+}

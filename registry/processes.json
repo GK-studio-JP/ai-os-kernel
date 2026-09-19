@@ -1,0 +1,44 @@
+{
+  "schema": "ai-os-process-registry:v1",
+  "processes": [
+    {
+      "id": "PROC-KERNEL",
+      "repository": "GK-studio-JP/ai-os-kernel",
+      "capabilities": [
+        "registry.read",
+        "task.spawn",
+        "context.read",
+        "ipc.send",
+        "event.publish",
+        "state.commit"
+      ]
+    },
+    {
+      "id": "PROC-SCHEDULER",
+      "repository": "GK-studio-JP/ai-os-scheduler",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish"
+      ]
+    },
+    {
+      "id": "PROC-CONTEXT",
+      "repository": "GK-studio-JP/ai-os-context",
+      "capabilities": [
+        "context.read",
+        "event.publish"
+      ]
+    },
+    {
+      "id": "PROC-BULLETIN",
+      "repository": "kj2whvbzjn-hue/ai-bulletin-board",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish",
+        "state.commit"
+      ]
+    }
+  ]
+}
