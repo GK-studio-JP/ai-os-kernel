@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,12 @@ def _write(path: str | None, value: Any) -> None:
         out.write_text(text, encoding="utf-8")
     else:
         print(text, end="")
+
+
+def _plan_fingerprint(plan: dict[str, Any]) -> str:
+    material = {key: value for key, value in plan.items() if key != "fingerprint"}
+    canonical = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def process_map(registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -111,6 +118,17 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
         errors.append({"code": "unsupported_plan_schema", "value": plan.get("schema")})
     if plan.get("authoritative") is not False:
         errors.append({"code": "dispatch_plan_must_be_non_authoritative"})
+
+    supplied_fingerprint = plan.get("fingerprint")
+    expected_fingerprint = _plan_fingerprint(plan)
+    if supplied_fingerprint != expected_fingerprint:
+        errors.append(
+            {
+                "code": "plan_fingerprint_mismatch",
+                "expected": expected_fingerprint,
+                "actual": supplied_fingerprint,
+            }
+        )
 
     dispatches = plan.get("dispatches")
     if not isinstance(dispatches, list):
