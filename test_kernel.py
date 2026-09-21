@@ -1,6 +1,14 @@
+import hashlib
+import json
 import unittest
 
 from kernel import authorize, validate_dispatch
+
+def signed_plan(value):
+    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    value["fingerprint"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return value
+
 
 REGISTRY = {
     "schema": "ai-os-process-registry:v1",
@@ -50,10 +58,9 @@ class KernelTests(unittest.TestCase):
         self.assertEqual(authorize(REGISTRY, syscall)["decision"], "ESCALATE")
 
     def test_validate_dispatch(self):
-        plan = {
+        plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",
             "authoritative": False,
-            "fingerprint": "sha256:x",
             "dispatches": [
                 {
                     "schema": "ai-os-dispatch:v1",
@@ -63,12 +70,35 @@ class KernelTests(unittest.TestCase):
                     "target_repository": "owner/a",
                 }
             ],
-        }
+        })
         result = validate_dispatch(REGISTRY, plan)
         self.assertTrue(result["valid"])
 
+    def test_tampered_plan_fingerprint_fails(self):
+        plan = signed_plan(
+            {
+                "schema": "ai-os-dispatch-plan:v1",
+                "authoritative": False,
+                "dispatches": [
+                    {
+                        "schema": "ai-os-dispatch:v1",
+                        "authoritative": False,
+                        "task": "#1",
+                        "process": "PROC-A",
+                        "target_repository": "owner/a",
+                    }
+                ],
+            }
+        )
+        plan["dispatches"][0]["task"] = "#999"
+        result = validate_dispatch(REGISTRY, plan)
+        self.assertFalse(result["valid"])
+        self.assertTrue(
+            any(error["code"] == "plan_fingerprint_mismatch" for error in result["errors"])
+        )
+
     def test_dispatch_repo_mismatch_fails(self):
-        plan = {
+        plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",
             "authoritative": False,
             "dispatches": [
@@ -80,13 +110,13 @@ class KernelTests(unittest.TestCase):
                     "target_repository": "owner/wrong",
                 }
             ],
-        }
+        })
         result = validate_dispatch(REGISTRY, plan)
         self.assertFalse(result["valid"])
         self.assertEqual(result["errors"][0]["code"], "target_repository_mismatch")
 
     def test_runtime_process_can_target_registered_repo(self):
-        plan = {
+        plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",
             "authoritative": False,
             "dispatches": [
@@ -98,12 +128,12 @@ class KernelTests(unittest.TestCase):
                     "target_repository": "owner/a",
                 }
             ],
-        }
+        })
         result = validate_dispatch(REGISTRY, plan)
         self.assertTrue(result["valid"])
 
     def test_runtime_process_rejects_unregistered_repo(self):
-        plan = {
+        plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",
             "authoritative": False,
             "dispatches": [
@@ -115,7 +145,7 @@ class KernelTests(unittest.TestCase):
                     "target_repository": "owner/external",
                 }
             ],
-        }
+        })
         result = validate_dispatch(REGISTRY, plan)
         self.assertFalse(result["valid"])
         self.assertEqual(result["errors"][0]["code"], "target_repository_unregistered")
