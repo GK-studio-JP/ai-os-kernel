@@ -132,6 +132,57 @@ class KernelTests(unittest.TestCase):
         result = validate_dispatch(REGISTRY, plan)
         self.assertTrue(result["valid"])
 
+    def test_dispatch_requires_target_repository(self):
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#2",
+                    "process": "PROC-BROWSER",
+                    "target_repository": "",
+                }
+            ],
+        })
+        result = validate_dispatch(REGISTRY, plan)
+        self.assertFalse(result["valid"])
+        self.assertTrue(
+            any(error["code"] == "target_repository_required" for error in result["errors"])
+        )
+
+    def test_mutation_receipt_rejects_empty_repository_scope(self):
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#2",
+                    "process": "PROC-BROWSER",
+                    "target_repository": "",
+                }
+            ],
+        })
+        syscall = {
+            "schema": "ai-os-syscall:v1",
+            "id": "SYS-MUT-EMPTY-REPO",
+            "caller": {"process": "PROC-BROWSER"},
+            "operation": "mutate_repository",
+            "scope": {
+                "task": "#2",
+                "repository": "",
+                "mode": "branch-pr",
+            },
+        }
+        result = authorize_dispatch_mutation(REGISTRY, plan, syscall)
+        self.assertFalse(result["approved"])
+        self.assertTrue(
+            any(error["code"] == "target_repository_required" for error in result["errors"])
+        )
+
     def test_browser_mutation_receipt_binds_dispatch_scope(self):
         plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",
