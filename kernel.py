@@ -12,6 +12,7 @@ DECISION_SCHEMA = "ai-os-kernel-decision:v1"
 PLAN_SCHEMA = "ai-os-dispatch-plan:v1"
 DISPATCH_SCHEMA = "ai-os-dispatch:v1"
 VALIDATION_SCHEMA = "ai-os-kernel-dispatch-validation:v1"
+RECEIPT_SCHEMA = "ai-os-kernel-capability-receipt:v1"
 
 OP_CAPABILITY = {
     "spawn_task": "task.spawn",
@@ -19,6 +20,7 @@ OP_CAPABILITY = {
     "send_message": "ipc.send",
     "publish_event": "event.publish",
     "commit_state": "state.commit",
+    "mutate_repository": "repository.write.branch",
     "wait": None,
     "exit": None,
     "escalate": None,
@@ -39,10 +41,14 @@ def _write(path: str | None, value: Any) -> None:
         print(text, end="")
 
 
-def _plan_fingerprint(plan: dict[str, Any]) -> str:
-    material = {key: value for key, value in plan.items() if key != "fingerprint"}
+def _fingerprint(value: dict[str, Any]) -> str:
+    material = {key: item for key, item in value.items() if key != "fingerprint"}
     canonical = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _plan_fingerprint(plan: dict[str, Any]) -> str:
+    return _fingerprint(plan)
 
 
 def process_map(registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -200,8 +206,111 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
     }
 
 
+def authorize_dispatch_mutation(
+    registry: dict[str, Any],
+    plan: dict[str, Any],
+    syscall: dict[str, Any],
+) -> dict[str, Any]:
+    validation = validate_dispatch(registry, plan)
+    decision = authorize(registry, syscall)
+    errors: list[dict[str, Any]] = []
+
+    if not validation["valid"]:
+        errors.append({"code": "dispatch_validation_failed", "details": validation["errors"]})
+
+    dispatches = plan.get("dispatches")
+    if not isinstance(dispatches, list) or len(dispatches) != 1:
+        errors.append({"code": "exactly_one_dispatch_required"})
+        dispatch: dict[str, Any] = {}
+    else:
+        dispatch = dispatches[0] if isinstance(dispatches[0], dict) else {}
+        if not dispatch:
+            errors.append({"code": "invalid_dispatch"})
+
+    if syscall.get("operation") != "mutate_repository":
+        errors.append({"code": "mutation_operation_required"})
+    if decision.get("decision") != "APPROVED":
+        errors.append(
+            {
+                "code": "kernel_decision_not_approved",
+                "decision": decision.get("decision"),
+                "reason_code": decision.get("reason_code"),
+            }
+        )
+
+    caller = str((syscall.get("caller") or {}).get("process") or "")
+    if dispatch and caller != str(dispatch.get("process") or ""):
+        errors.append(
+            {
+                "code": "caller_process_mismatch",
+                "expected": dispatch.get("process"),
+                "actual": caller,
+            }
+        )
+
+    scope = syscall.get("scope")
+    if not isinstance(scope, dict):
+        errors.append({"code": "mutation_scope_required"})
+        scope = {}
+
+    expected_task = str(dispatch.get("task") or "")
+    expected_repository = str(dispatch.get("target_repository") or "")
+    if str(scope.get("task") or "") != expected_task:
+        errors.append(
+            {
+                "code": "task_scope_mismatch",
+                "expected": expected_task,
+                "actual": scope.get("task"),
+            }
+        )
+    if str(scope.get("repository") or "") != expected_repository:
+        errors.append(
+            {
+                "code": "repository_scope_mismatch",
+                "expected": expected_repository,
+                "actual": scope.get("repository"),
+            }
+        )
+    if scope.get("mode") != "branch-pr":
+        errors.append({"code": "unsupported_mutation_mode", "actual": scope.get("mode")})
+
+    receipt = {
+        "schema": RECEIPT_SCHEMA,
+        "authoritative": False,
+        "persist_required": True,
+        "approved": not errors,
+        "caller": caller,
+        "operation": "mutate_repository",
+        "required_capability": decision.get("required_capability"),
+        "task": expected_task,
+        "target_repository": expected_repository,
+        "source_plan_fingerprint": plan.get("fingerprint"),
+        "constraints": {
+            "mode": "branch-pr",
+            "allowed_browser_actions": ["fill", "click"],
+            "forbid_direct_main_commit": True,
+            "require_new_branch": True,
+            "require_pull_request": True,
+        },
+        "errors": errors,
+    }
+    receipt["fingerprint"] = _fingerprint(receipt)
+    return receipt
+
+
 def command_authorize(args: argparse.Namespace) -> None:
     _write(args.output, authorize(_read(args.registry), _read(args.syscall)))
+
+
+def command_authorize_dispatch_mutation(args: argparse.Namespace) -> None:
+    result = authorize_dispatch_mutation(
+        _read(args.registry),
+        _read(args.plan),
+        _read(args.syscall),
+    )
+    _write(args.output, result)
+    if not result["approved"]:
+        raise SystemExit(2)
 
 
 def command_validate_dispatch(args: argparse.Namespace) -> None:
@@ -226,6 +335,16 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--plan", required=True)
     p.add_argument("--output")
     p.set_defaults(func=command_validate_dispatch)
+
+    p = sub.add_parser(
+        "authorize-dispatch-mutation",
+        help="bind a branch/PR repository mutation receipt to one validated dispatch",
+    )
+    p.add_argument("--registry", required=True)
+    p.add_argument("--plan", required=True)
+    p.add_argument("--syscall", required=True)
+    p.add_argument("--output")
+    p.set_defaults(func=command_authorize_dispatch_mutation)
     return root
 
 
