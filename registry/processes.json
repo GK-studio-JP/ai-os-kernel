@@ -48,7 +48,8 @@
       "capabilities": [
         "context.read",
         "ipc.send",
-        "event.publish"
+        "event.publish",
+        "repository.write.branch"
       ],
       "routing": {
         "target_mode": "registered-process-repository"

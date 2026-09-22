@@ -2,7 +2,7 @@ import hashlib
 import json
 import unittest
 
-from kernel import authorize, validate_dispatch
+from kernel import authorize, authorize_dispatch_mutation, validate_dispatch
 
 def signed_plan(value):
     canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -18,7 +18,7 @@ REGISTRY = {
         {
             "id": "PROC-BROWSER",
             "repository": "owner/browser",
-            "capabilities": [],
+            "capabilities": ["repository.write.branch"],
             "routing": {"target_mode": "registered-process-repository"},
         },
     ],
@@ -131,6 +131,102 @@ class KernelTests(unittest.TestCase):
         })
         result = validate_dispatch(REGISTRY, plan)
         self.assertTrue(result["valid"])
+
+    def test_browser_mutation_receipt_binds_dispatch_scope(self):
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#2",
+                    "process": "PROC-BROWSER",
+                    "target_repository": "owner/a",
+                }
+            ],
+        })
+        syscall = {
+            "schema": "ai-os-syscall:v1",
+            "id": "SYS-MUT-1",
+            "caller": {"process": "PROC-BROWSER"},
+            "operation": "mutate_repository",
+            "scope": {
+                "task": "#2",
+                "repository": "owner/a",
+                "mode": "branch-pr",
+            },
+        }
+        result = authorize_dispatch_mutation(REGISTRY, plan, syscall)
+        self.assertTrue(result["approved"])
+        self.assertEqual(result["required_capability"], "repository.write.branch")
+        self.assertEqual(result["task"], "#2")
+        self.assertEqual(result["target_repository"], "owner/a")
+        self.assertTrue(result["constraints"]["forbid_direct_main_commit"])
+        self.assertTrue(result["constraints"]["require_pull_request"])
+        self.assertTrue(result["fingerprint"].startswith("sha256:"))
+
+    def test_browser_mutation_receipt_rejects_scope_mismatch(self):
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#2",
+                    "process": "PROC-BROWSER",
+                    "target_repository": "owner/a",
+                }
+            ],
+        })
+        syscall = {
+            "schema": "ai-os-syscall:v1",
+            "id": "SYS-MUT-2",
+            "caller": {"process": "PROC-BROWSER"},
+            "operation": "mutate_repository",
+            "scope": {
+                "task": "#2",
+                "repository": "owner/b",
+                "mode": "branch-pr",
+            },
+        }
+        result = authorize_dispatch_mutation(REGISTRY, plan, syscall)
+        self.assertFalse(result["approved"])
+        self.assertTrue(
+            any(error["code"] == "repository_scope_mismatch" for error in result["errors"])
+        )
+
+    def test_browser_mutation_receipt_requires_capability(self):
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#1",
+                    "process": "PROC-A",
+                    "target_repository": "owner/a",
+                }
+            ],
+        })
+        syscall = {
+            "schema": "ai-os-syscall:v1",
+            "id": "SYS-MUT-3",
+            "caller": {"process": "PROC-A"},
+            "operation": "mutate_repository",
+            "scope": {
+                "task": "#1",
+                "repository": "owner/a",
+                "mode": "branch-pr",
+            },
+        }
+        result = authorize_dispatch_mutation(REGISTRY, plan, syscall)
+        self.assertFalse(result["approved"])
+        self.assertTrue(
+            any(error["code"] == "kernel_decision_not_approved" for error in result["errors"])
+        )
 
     def test_runtime_process_rejects_unregistered_repo(self):
         plan = signed_plan({
