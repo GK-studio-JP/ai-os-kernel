@@ -155,12 +155,22 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
             errors.append({"code": "unknown_target_process", "index": index, "process": process_id})
             continue
         expected_repo = process.get("repository")
-        target_repo = dispatch.get("target_repository")
+        raw_target_repo = dispatch.get("target_repository")
+        target_repo = raw_target_repo.strip() if isinstance(raw_target_repo, str) else ""
         routing = process.get("routing") or {}
         target_mode = routing.get("target_mode", "self")
 
-        if target_mode == "self":
-            if target_repo and expected_repo and target_repo != expected_repo:
+        if not target_repo:
+            errors.append(
+                {
+                    "code": "target_repository_required",
+                    "index": index,
+                    "process": process_id,
+                    "actual": raw_target_repo,
+                }
+            )
+        elif target_mode == "self":
+            if expected_repo and target_repo != expected_repo:
                 errors.append(
                     {
                         "code": "target_repository_mismatch",
@@ -176,7 +186,7 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
                 for value in processes.values()
                 if value.get("repository")
             }
-            if target_repo and target_repo not in registered_repositories:
+            if target_repo not in registered_repositories:
                 errors.append(
                     {
                         "code": "target_repository_unregistered",
@@ -254,7 +264,14 @@ def authorize_dispatch_mutation(
         scope = {}
 
     expected_task = str(dispatch.get("task") or "")
-    expected_repository = str(dispatch.get("target_repository") or "")
+    raw_expected_repository = dispatch.get("target_repository")
+    expected_repository = (
+        raw_expected_repository.strip()
+        if isinstance(raw_expected_repository, str)
+        else ""
+    )
+    if not expected_repository:
+        errors.append({"code": "target_repository_required"})
     if str(scope.get("task") or "") != expected_task:
         errors.append(
             {
