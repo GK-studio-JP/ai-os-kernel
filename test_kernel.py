@@ -1,6 +1,7 @@
 import hashlib
 import json
 import unittest
+from pathlib import Path
 
 from kernel import authorize, authorize_dispatch_mutation, validate_dispatch
 
@@ -296,6 +297,53 @@ class KernelTests(unittest.TestCase):
         result = validate_dispatch(REGISTRY, plan)
         self.assertFalse(result["valid"])
         self.assertEqual(result["errors"][0]["code"], "target_repository_unregistered")
+
+
+    def test_production_registry_allows_browser_worker_to_target_browser_agent(self):
+        registry = json.loads(
+            Path("registry/processes.json").read_text(encoding="utf-8")
+        )
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#20",
+                    "process": "PROC-RUNTIME-BROWSER-WORKER",
+                    "target_repository": "GK-studio-JP/browser-agent",
+                }
+            ],
+        })
+        result = validate_dispatch(registry, plan)
+        self.assertTrue(result["valid"], result["errors"])
+
+    def test_production_registry_rejects_unregistered_browser_worker_target(self):
+        registry = json.loads(
+            Path("registry/processes.json").read_text(encoding="utf-8")
+        )
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#20",
+                    "process": "PROC-RUNTIME-BROWSER-WORKER",
+                    "target_repository": "GK-studio-JP/not-registered",
+                }
+            ],
+        })
+        result = validate_dispatch(registry, plan)
+        self.assertFalse(result["valid"])
+        self.assertTrue(
+            any(
+                error["code"] == "target_repository_unregistered"
+                for error in result["errors"]
+            )
+        )
 
 
 if __name__ == "__main__":
