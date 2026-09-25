@@ -1,0 +1,25 @@
+{
+  "schema": "ai-os-control-plane-lock:v1",
+  "repositories": [
+    {
+      "repository": "GK-studio-JP/ai-os-context",
+      "commit": "87b7012fc98573c7223e85357369a5f552e242a4"
+    },
+    {
+      "repository": "GK-studio-JP/ai-os-scheduler",
+      "commit": "26126eb2bf392ff430b36ab8436747877c1a8c31"
+    },
+    {
+      "repository": "GK-studio-JP/ai-os-runtime",
+      "commit": "d17f7024ebd2015a1595ed531406dd594d04741b"
+    },
+    {
+      "repository": "GK-studio-JP/ai-os-runtime-browser-worker",
+      "commit": "16b269eb9185122faeb13b18292049cd81928631"
+    },
+    {
+      "repository": "GK-studio-JP/browser-agent",
+      "commit": "5af39ee5855d2de9d41b06ea655432a93d6e0ba8"
+    }
+  ]
+}

@@ -83,3 +83,19 @@ The bundle still cannot authorize an ownership-sensitive write. A Worker/runtime
 - Kernel validation never changes Scheduler ordering.
 - Kernel output is not durable authority until persisted by the runtime.
 - Repository implementation details stay outside the Kernel.
+
+## Control-plane dependency lock
+
+The Kernel registry is the authority boundary for control-plane dependency selection. `registry/control-plane-lock.json` pins the audited commits for Context, Scheduler, Runtime, Browser Worker, and Browser Agent with full lowercase 40-hex Git commit SHAs.
+
+`control_plane_lock.py` validates this lock fail closed: the schema and fields are exact, the repository set is fixed, duplicates and unknown repositories/fields are rejected, and floating branches or mutable tags are not accepted as commits.
+
+Consumers should pin only one immutable Kernel bootstrap commit, then resolve governed dependency SHAs from that Kernel snapshot. For GitHub Actions, the supported resolver is:
+
+```bash
+python control_plane_lock.py export-github \
+  --lock registry/control-plane-lock.json \
+  --output "$GITHUB_OUTPUT"
+```
+
+A consumer must not independently choose a different Context, Scheduler, Runtime, Browser Worker, or Browser Agent SHA already governed by the selected Kernel snapshot. Updating those dependency versions therefore starts with a Kernel lock PR; consumer workflow migrations then select that immutable Kernel snapshot. Third-party GitHub Action pins remain separate supply-chain pins and stay immutable.
