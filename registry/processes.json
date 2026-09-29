@@ -69,6 +69,16 @@
         "event.publish",
         "state.commit"
       ]
+    },
+    {
+      "id": "PROC-MUSIC",
+      "repository": "GK-studio-JP/music-transcription-kb",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish",
+        "repository.write.branch"
+      ]
     }
   ],
   "canonical_board": "GK-studio-JP/ai-bulletin-board"
