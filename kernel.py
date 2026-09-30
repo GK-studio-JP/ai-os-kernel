@@ -195,6 +195,30 @@ def validate_dispatch(registry: dict[str, Any], plan: dict[str, Any]) -> dict[st
                         "actual": target_repo,
                     }
                 )
+        elif target_mode == "explicit-repository-allowlist":
+            raw_allowed = routing.get("target_repositories")
+            if (
+                not isinstance(raw_allowed, list)
+                or not raw_allowed
+                or any(not isinstance(value, str) or not value.strip() for value in raw_allowed)
+                or len(set(raw_allowed)) != len(raw_allowed)
+            ):
+                errors.append(
+                    {
+                        "code": "invalid_target_repository_allowlist",
+                        "index": index,
+                        "process": process_id,
+                    }
+                )
+            elif target_repo not in set(raw_allowed):
+                errors.append(
+                    {
+                        "code": "target_repository_not_allowed",
+                        "index": index,
+                        "process": process_id,
+                        "actual": target_repo,
+                    }
+                )
         else:
             errors.append(
                 {

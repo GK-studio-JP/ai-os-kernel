@@ -280,6 +280,148 @@ class KernelTests(unittest.TestCase):
             any(error["code"] == "kernel_decision_not_approved" for error in result["errors"])
         )
 
+    def test_explicit_repository_allowlist_accepts_listed_target(self):
+        registry = {
+            "schema": "ai-os-process-registry:v1",
+            "processes": [
+                {
+                    "id": "PROC-AIOS",
+                    "repository": "owner/control",
+                    "capabilities": ["repository.write.branch"],
+                    "routing": {
+                        "target_mode": "explicit-repository-allowlist",
+                        "target_repositories": ["owner/control", "owner/api"],
+                    },
+                }
+            ],
+        }
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#30",
+                    "process": "PROC-AIOS",
+                    "target_repository": "owner/api",
+                }
+            ],
+        })
+        self.assertTrue(validate_dispatch(registry, plan)["valid"])
+
+    def test_explicit_repository_allowlist_rejects_unlisted_target(self):
+        registry = {
+            "schema": "ai-os-process-registry:v1",
+            "processes": [
+                {
+                    "id": "PROC-AIOS",
+                    "repository": "owner/control",
+                    "capabilities": ["repository.write.branch"],
+                    "routing": {
+                        "target_mode": "explicit-repository-allowlist",
+                        "target_repositories": ["owner/control", "owner/api"],
+                    },
+                }
+            ],
+        }
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#31",
+                    "process": "PROC-AIOS",
+                    "target_repository": "owner/external",
+                }
+            ],
+        })
+        result = validate_dispatch(registry, plan)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any(error["code"] == "target_repository_not_allowed" for error in result["errors"]))
+
+    def test_explicit_repository_allowlist_fails_closed_when_malformed(self):
+        registry = {
+            "schema": "ai-os-process-registry:v1",
+            "processes": [
+                {
+                    "id": "PROC-AIOS",
+                    "repository": "owner/control",
+                    "capabilities": ["repository.write.branch"],
+                    "routing": {
+                        "target_mode": "explicit-repository-allowlist",
+                        "target_repositories": [],
+                    },
+                }
+            ],
+        }
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#32",
+                    "process": "PROC-AIOS",
+                    "target_repository": "owner/control",
+                }
+            ],
+        })
+        result = validate_dispatch(registry, plan)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any(error["code"] == "invalid_target_repository_allowlist" for error in result["errors"]))
+
+    def test_production_registry_allows_aios_to_target_api(self):
+        registry = json.loads(Path("registry/processes.json").read_text(encoding="utf-8"))
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#33",
+                    "process": "PROC-AIOS",
+                    "target_repository": "GK-studio-JP/ai-os-api",
+                }
+            ],
+        })
+        result = validate_dispatch(registry, plan)
+        self.assertTrue(result["valid"], result["errors"])
+
+    def test_production_registry_allows_aios_branch_pr_mutation(self):
+        registry = json.loads(Path("registry/processes.json").read_text(encoding="utf-8"))
+        plan = signed_plan({
+            "schema": "ai-os-dispatch-plan:v1",
+            "authoritative": False,
+            "dispatches": [
+                {
+                    "schema": "ai-os-dispatch:v1",
+                    "authoritative": False,
+                    "task": "#34",
+                    "process": "PROC-AIOS",
+                    "target_repository": "GK-studio-JP/ai-os-kernel",
+                }
+            ],
+        })
+        syscall = {
+            "schema": "ai-os-syscall:v1",
+            "id": "SYS-AIOS-MUT-1",
+            "caller": {"process": "PROC-AIOS"},
+            "operation": "mutate_repository",
+            "scope": {
+                "task": "#34",
+                "repository": "GK-studio-JP/ai-os-kernel",
+                "mode": "branch-pr",
+            },
+        }
+        result = authorize_dispatch_mutation(registry, plan, syscall)
+        self.assertTrue(result["approved"], result["errors"])
+        self.assertTrue(result["constraints"]["require_pull_request"])
+
     def test_runtime_process_rejects_unregistered_repo(self):
         plan = signed_plan({
             "schema": "ai-os-dispatch-plan:v1",

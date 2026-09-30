@@ -62,6 +62,14 @@ python kernel.py validate-dispatch \
 
 This does not re-rank tasks. It only enforces the Kernel's identity boundary.
 
+Processes may route repository targets in three fail-closed modes:
+
+- `self`: only the process repository;
+- `registered-process-repository`: any repository represented by a registered process;
+- `explicit-repository-allowlist`: only repositories listed in that process's `routing.target_repositories`.
+
+`PROC-AIOS` uses the explicit allowlist so AIOS can harden its own registered service repositories without turning every repository into a synthetic process identity.
+
 ## End-to-end smoke workflow
 
 `.github/workflows/control-plane-smoke.yml` performs the current bounded control-plane loop:
