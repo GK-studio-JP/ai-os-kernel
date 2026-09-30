@@ -56,6 +56,29 @@
       }
     },
     {
+      "id": "PROC-AIOS",
+      "repository": "GK-studio-JP/ai-os-projects",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish",
+        "repository.write.branch"
+      ],
+      "routing": {
+        "target_mode": "explicit-repository-allowlist",
+        "target_repositories": [
+          "GK-studio-JP/ai-os-projects",
+          "GK-studio-JP/ai-os-api",
+          "GK-studio-JP/ai-os-context",
+          "GK-studio-JP/ai-os-scheduler",
+          "GK-studio-JP/ai-os-kernel",
+          "GK-studio-JP/ai-os-runtime",
+          "GK-studio-JP/ai-os-runtime-browser-worker",
+          "GK-studio-JP/browser-agent"
+        ]
+      }
+    },
+    {
       "id": "PROC-BROWSER-AGENT",
       "repository": "GK-studio-JP/browser-agent",
       "capabilities": []
