@@ -74,7 +74,9 @@
           "GK-studio-JP/ai-os-kernel",
           "GK-studio-JP/ai-os-runtime",
           "GK-studio-JP/ai-os-runtime-browser-worker",
-          "GK-studio-JP/browser-agent"
+          "GK-studio-JP/browser-agent",
+          "GK-studio-JP/ai-bulletin-board",
+          "GK-studio-JP/ai-os-memory"
         ]
       }
     },
