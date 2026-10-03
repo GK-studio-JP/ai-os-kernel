@@ -104,6 +104,16 @@
         "event.publish",
         "repository.write.branch"
       ]
+    },
+    {
+      "id": "PROC-GAME",
+      "repository": "GK-studio-JP/MyGame-1",
+      "capabilities": [
+        "context.read",
+        "ipc.send",
+        "event.publish",
+        "repository.write.branch"
+      ]
     }
   ],
   "canonical_board": "GK-studio-JP/ai-bulletin-board"
